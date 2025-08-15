@@ -11,6 +11,22 @@ class ScheduleApp {
   async init() {
     console.log('Initializing Schedule Coordinator App...');
     
+    // Configure axios defaults
+    axios.defaults.baseURL = '/api';
+    axios.defaults.headers.common['Content-Type'] = 'application/json';
+    
+    // Add request interceptor for error handling
+    axios.interceptors.response.use(
+      response => response,
+      error => {
+        console.error('API Error:', error);
+        if (error.response && error.response.status === 401) {
+          window.location.href = '/api/auth/google';
+        }
+        return Promise.reject(error);
+      }
+    );
+    
     // Initialize event listeners
     this.initEventListeners();
     

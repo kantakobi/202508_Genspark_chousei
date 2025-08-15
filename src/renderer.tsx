@@ -26,35 +26,6 @@ export const renderer = jsxRenderer(({ children }) => {
         
         {/* Custom styles */}
         <link href="/static/style.css" rel="stylesheet" />
-        
-        <script>
-          {`
-            // Configure dayjs plugins
-            dayjs.extend(dayjs_plugin_utc);
-            dayjs.extend(dayjs_plugin_timezone);
-            dayjs.extend(dayjs_plugin_relativeTime);
-            dayjs.extend(dayjs_plugin_isoWeek);
-            
-            // Set default timezone to Asia/Tokyo
-            dayjs.tz.setDefault('Asia/Tokyo');
-            
-            // Configure axios defaults
-            axios.defaults.baseURL = '/api';
-            axios.defaults.headers.common['Content-Type'] = 'application/json';
-            
-            // Add request interceptor for error handling
-            axios.interceptors.response.use(
-              response => response,
-              error => {
-                console.error('API Error:', error);
-                if (error.response?.status === 401) {
-                  window.location.href = '/api/auth/google';
-                }
-                return Promise.reject(error);
-              }
-            );
-          `}
-        </script>
       </head>
       <body class="bg-gray-50 font-sans">
         <nav class="bg-white shadow-sm border-b border-gray-200">
@@ -97,7 +68,7 @@ export const renderer = jsxRenderer(({ children }) => {
         </div>
         
         {/* Custom JavaScript */}
-        <script src="/static/app.js"></script>
+        <script src="/static/app-simple.js"></script>
       </body>
     </html>
   )
