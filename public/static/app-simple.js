@@ -66,16 +66,25 @@ document.addEventListener('DOMContentLoaded', async function() {
           
           <div class="space-y-4">
             <h3 class="text-lg font-medium">機能テスト</h3>
-            <div class="space-x-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               ${isAuthenticated ? `
                 <button onclick="testCreateEvent()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
-                  <i class="fas fa-plus mr-2"></i>イベント作成テスト
+                  <i class="fas fa-plus mr-2"></i>イベント作成
+                </button>
+                <button onclick="testCalendarEvents()" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700">
+                  <i class="fas fa-calendar mr-2"></i>カレンダー取得
+                </button>
+                <button onclick="testConfirmEvent()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                  <i class="fas fa-check mr-2"></i>イベント確定
+                </button>
+                <button onclick="testConflictCheck()" class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700">
+                  <i class="fas fa-exclamation-triangle mr-2"></i>競合チェック
                 </button>
                 <button onclick="testLogout()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
                   <i class="fas fa-sign-out-alt mr-2"></i>ログアウト
                 </button>
               ` : `
-                <button onclick="testGoogleAuth()" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+                <button onclick="testGoogleAuth()" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 col-span-full">
                   <i class="fab fa-google mr-2"></i>Google認証テスト
                 </button>
               `}
@@ -143,5 +152,89 @@ window.testLogout = async function() {
   } catch (error) {
     console.error('Logout test failed:', error);
     alert('ログアウト失敗: ' + error.message);
+  }
+};
+
+window.testCalendarEvents = async function() {
+  try {
+    const response = await fetch('/api/calendar/events');
+    const data = await response.json();
+    console.log('Calendar events:', data);
+    
+    if (data.error) {
+      alert('カレンダーイベント取得エラー: ' + data.error);
+    } else {
+      alert(`カレンダーイベント取得成功！\n${data.events.length}件のイベントが見つかりました。\n\n詳細はコンソールを確認してください。`);
+    }
+  } catch (error) {
+    console.error('Calendar events test failed:', error);
+    alert('カレンダーイベント取得失敗: ' + error.message);
+  }
+};
+
+window.testConfirmEvent = async function() {
+  try {
+    const response = await fetch('/api/events/1/confirm', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        time_slot_id: 1,
+        location: 'オンライン会議室'
+      })
+    });
+    const data = await response.json();
+    console.log('Event confirmation:', data);
+    
+    if (data.error) {
+      alert('イベント確定エラー: ' + data.error);
+    } else {
+      const message = `イベント確定成功！\n\n` +
+        `Google Event ID: ${data.google_event_id || 'N/A'}\n` +
+        `Calendar URL: ${data.calendar_url || 'N/A'}\n\n` +
+        `詳細はコンソールを確認してください。`;
+      alert(message);
+    }
+  } catch (error) {
+    console.error('Event confirmation test failed:', error);
+    alert('イベント確定失敗: ' + error.message);
+  }
+};
+
+window.testConflictCheck = async function() {
+  try {
+    const startTime = '2025-08-20T10:00:00Z';
+    const endTime = '2025-08-20T11:30:00Z';
+    
+    const response = await fetch('/api/calendar/check-conflicts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        startTime,
+        endTime,
+        participantIds: [] // empty for now
+      })
+    });
+    const data = await response.json();
+    console.log('Conflict check:', data);
+    
+    if (data.error) {
+      alert('競合チェックエラー: ' + data.error);
+    } else {
+      const conflicts = Object.values(data.conflicts || {});
+      const hasAnyConflict = conflicts.some(c => c.hasConflict);
+      
+      const message = `競合チェック完了！\n\n` +
+        `期間: ${new Date(startTime).toLocaleString()} - ${new Date(endTime).toLocaleString()}\n` +
+        `結果: ${hasAnyConflict ? '競合あり' : '競合なし'}\n\n` +
+        `詳細はコンソールを確認してください。`;
+      alert(message);
+    }
+  } catch (error) {
+    console.error('Conflict check test failed:', error);
+    alert('競合チェック失敗: ' + error.message);
   }
 };

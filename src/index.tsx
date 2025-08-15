@@ -4,6 +4,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 import { renderer } from './renderer'
 import { Bindings } from './types'
 import { GoogleOAuth, UserService, JWTAuth, requireAuth, generateOAuthState } from './lib/auth'
+import { CalendarService, GoogleCalendarAPI } from './lib/calendar'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -287,30 +288,176 @@ app.post('/api/events/:id/respond', async (c) => {
 })
 
 app.post('/api/events/:id/confirm', async (c) => {
-  const eventId = c.req.param('id')
-  const body = await c.req.json()
-  // TODO: Confirm event and create Google Calendar event
-  return c.json({ 
-    message: 'Event confirmed', 
-    event_id: eventId, 
-    google_event_id: 'mock_google_event_id',
-    calendar_url: 'https://calendar.google.com/event?eid=mock_event_id'
-  })
+  try {
+    const session = await requireAuth(c)
+    
+    if (!session) {
+      return c.json({ error: 'Authentication required' }, 401)
+    }
+
+    const eventId = c.req.param('id')
+    const body = await c.req.json()
+    const { time_slot_id, location } = body
+
+    if (!time_slot_id) {
+      return c.json({ error: 'Time slot ID is required' }, 400)
+    }
+
+    // TODO: In real implementation, fetch event and time slot from database
+    // For now, we'll use mock data with proper calendar integration
+    
+    const mockEvent = {
+      id: parseInt(eventId),
+      title: 'プロジェクト会議',
+      description: '新規プロジェクトのキックオフ会議',
+      created_by: session.user_id
+    }
+
+    const mockTimeSlot = {
+      id: parseInt(time_slot_id),
+      start_datetime: '2025-08-20T10:00:00Z',
+      end_datetime: '2025-08-20T11:30:00Z'
+    }
+
+    // Get participant emails (mock data for now)
+    const participantEmails = ['kohira@example.com', 'tanaka@example.com']
+
+    // Create Google Calendar event
+    const calendarService = new CalendarService(c.env.DB)
+    const clientId = c.env.GOOGLE_CLIENT_ID || 'demo-google-client-id'
+    const clientSecret = c.env.GOOGLE_CLIENT_SECRET || 'demo-secret'
+    const appUrl = c.env.APP_URL || new URL(c.req.url).origin
+    const redirectUri = `${appUrl}/api/auth/google/callback`
+    
+    const googleOAuth = new GoogleOAuth(clientId, clientSecret, redirectUri)
+    
+    const result = await calendarService.createEventFromSchedule(
+      session.user_id,
+      {
+        title: mockEvent.title,
+        description: mockEvent.description,
+        startTime: mockTimeSlot.start_datetime,
+        endTime: mockTimeSlot.end_datetime,
+        attendeeEmails: participantEmails,
+        location: location || undefined
+      },
+      googleOAuth
+    )
+
+    if (!result.success) {
+      return c.json({ 
+        error: result.error || 'Failed to create calendar event',
+        fallback_message: 'イベントは確定されましたが、カレンダーへの追加に失敗しました'
+      }, 500)
+    }
+
+    // TODO: Update event status in database to 'confirmed'
+    // TODO: Save confirmed_events record with google_event_id
+
+    return c.json({ 
+      message: 'Event confirmed and added to calendar successfully', 
+      event_id: eventId,
+      time_slot_id,
+      google_event_id: result.eventId,
+      calendar_url: result.calendarUrl,
+      location: location || null
+    })
+  } catch (error) {
+    console.error('Confirm event error:', error)
+    return c.json({ error: 'Failed to confirm event' }, 500)
+  }
 })
 
 // Calendar integration
 app.get('/api/calendar/events', async (c) => {
-  // TODO: Get user's calendar events from Google Calendar
-  return c.json({ 
-    events: [
-      {
-        id: 'google_event_1',
-        title: '既存の会議',
-        start: '2025-08-20T09:00:00Z',
-        end: '2025-08-20T10:00:00Z'
-      }
-    ]
-  })
+  try {
+    const session = await requireAuth(c)
+    
+    if (!session) {
+      return c.json({ error: 'Authentication required' }, 401)
+    }
+
+    const calendarService = new CalendarService(c.env.DB)
+    const events = await calendarService.getUserUpcomingEvents(session.user_id, 30)
+    
+    if (!events) {
+      return c.json({ error: 'Failed to retrieve calendar events' }, 500)
+    }
+
+    return c.json({ 
+      events: events.map(event => ({
+        id: event.id,
+        title: event.summary,
+        description: event.description,
+        start: event.start?.dateTime,
+        end: event.end?.dateTime,
+        location: event.location,
+        attendees: event.attendees?.map(a => a.email) || []
+      }))
+    })
+  } catch (error) {
+    console.error('Get calendar events error:', error)
+    return c.json({ error: 'Failed to get calendar events' }, 500)
+  }
+})
+
+app.get('/api/calendar/calendars', async (c) => {
+  try {
+    const session = await requireAuth(c)
+    
+    if (!session) {
+      return c.json({ error: 'Authentication required' }, 401)
+    }
+
+    const calendarService = new CalendarService(c.env.DB)
+    const calendarAPI = await calendarService.getCalendarAPIForUser(session.user_id)
+    
+    if (!calendarAPI) {
+      return c.json({ error: 'Calendar access not available' }, 400)
+    }
+
+    const calendars = await calendarAPI.getCalendars()
+    
+    if (!calendars) {
+      return c.json({ error: 'Failed to retrieve calendars' }, 500)
+    }
+
+    return c.json({ calendars })
+  } catch (error) {
+    console.error('Get calendars error:', error)
+    return c.json({ error: 'Failed to get calendars' }, 500)
+  }
+})
+
+app.post('/api/calendar/check-conflicts', async (c) => {
+  try {
+    const session = await requireAuth(c)
+    
+    if (!session) {
+      return c.json({ error: 'Authentication required' }, 401)
+    }
+
+    const body = await c.req.json()
+    const { startTime, endTime, participantIds = [] } = body
+
+    if (!startTime || !endTime) {
+      return c.json({ error: 'Start time and end time are required' }, 400)
+    }
+
+    const calendarService = new CalendarService(c.env.DB)
+    const allUserIds = [session.user_id, ...participantIds]
+    
+    const conflicts = await calendarService.checkSchedulingConflicts(
+      allUserIds,
+      startTime,
+      endTime
+    )
+
+    return c.json({ conflicts })
+  } catch (error) {
+    console.error('Check conflicts error:', error)
+    return c.json({ error: 'Failed to check conflicts' }, 500)
+  }
 })
 
 // === HTML Pages ===
