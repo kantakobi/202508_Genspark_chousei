@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     const eventsData = await eventsResponse.json();
     console.log('Events data:', eventsData);
     
+    // Check authentication status
+    const isAuthenticated = authData.user && !authData.error;
+    
     // Update UI with basic data
     const app = document.getElementById('app');
     if (app) {
@@ -31,34 +34,51 @@ document.addEventListener('DOMContentLoaded', async function() {
           <div class="bg-green-100 p-4 rounded-lg">
             <p class="text-green-700">✅ アプリケーションが正常に動作しています</p>
             <p class="text-sm text-green-600 mt-2">API接続: OK</p>
+            <p class="text-sm text-green-600 mt-1">認証システム: ${isAuthenticated ? '✅ 認証済み' : '❌ 未認証'}</p>
           </div>
           
-          <div class="space-y-4">
-            <h3 class="text-lg font-medium">現在のイベント</h3>
-            <div class="grid gap-4">
-              ${eventsData.events.map(event => `
-                <div class="border border-gray-200 rounded-lg p-4">
-                  <h4 class="font-medium text-gray-900">${event.title}</h4>
-                  <p class="text-gray-600 text-sm">${event.description || ''}</p>
-                  <div class="mt-2">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                      ${event.status === 'open' ? '回答受付中' : event.status}
-                    </span>
-                  </div>
-                </div>
-              `).join('')}
+          ${!isAuthenticated ? `
+            <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <h3 class="text-lg font-medium text-blue-900 mb-2">Google認証が必要です</h3>
+              <p class="text-blue-700 mb-4">イベント管理機能を使用するには、Googleアカウントでログインしてください。</p>
+              <button onclick="testGoogleAuth()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                <i class="fab fa-google mr-2"></i>Googleでログイン
+              </button>
             </div>
-          </div>
+          ` : `
+            <div class="space-y-4">
+              <h3 class="text-lg font-medium">現在のイベント</h3>
+              <div class="grid gap-4">
+                ${(eventsData.events || []).map(event => `
+                  <div class="border border-gray-200 rounded-lg p-4">
+                    <h4 class="font-medium text-gray-900">${event.title}</h4>
+                    <p class="text-gray-600 text-sm">${event.description || ''}</p>
+                    <div class="mt-2">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        ${event.status === 'open' ? '回答受付中' : event.status}
+                      </span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `}
           
           <div class="space-y-4">
             <h3 class="text-lg font-medium">機能テスト</h3>
             <div class="space-x-4">
-              <button onclick="testCreateEvent()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                イベント作成テスト
-              </button>
-              <button onclick="testGoogleAuth()" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
-                Google認証テスト
-              </button>
+              ${isAuthenticated ? `
+                <button onclick="testCreateEvent()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                  <i class="fas fa-plus mr-2"></i>イベント作成テスト
+                </button>
+                <button onclick="testLogout()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                  <i class="fas fa-sign-out-alt mr-2"></i>ログアウト
+                </button>
+              ` : `
+                <button onclick="testGoogleAuth()" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+                  <i class="fab fa-google mr-2"></i>Google認証テスト
+                </button>
+              `}
             </div>
           </div>
         </div>
@@ -111,4 +131,17 @@ window.testCreateEvent = async function() {
 window.testGoogleAuth = function() {
   console.log('Redirecting to Google auth...');
   window.location.href = '/api/auth/google';
+};
+
+window.testLogout = async function() {
+  try {
+    const response = await fetch('/api/auth/logout', { method: 'GET' });
+    const data = await response.json();
+    console.log('Logout result:', data);
+    alert('ログアウトしました。ページを再読み込みします。');
+    window.location.reload();
+  } catch (error) {
+    console.error('Logout test failed:', error);
+    alert('ログアウト失敗: ' + error.message);
+  }
 };

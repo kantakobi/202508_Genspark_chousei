@@ -12,5 +12,8 @@
       "database_name": "schedule-coordinator-production",
       "database_id": ""
     }
-  ]
+  ],
+  "vars": {
+    "APP_URL": "https://schedule-coordinator.pages.dev"
+  }
 }
