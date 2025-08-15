@@ -5,6 +5,7 @@ import { renderer } from './renderer'
 import { Bindings } from './types'
 import { GoogleOAuth, UserService, JWTAuth, requireAuth, generateOAuthState } from './lib/auth'
 import { CalendarService, GoogleCalendarAPI } from './lib/calendar'
+import { ScheduleService } from './lib/schedule'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -202,21 +203,13 @@ app.get('/api/events', async (c) => {
     if (!session) {
       return c.json({ error: 'Authentication required' }, 401)
     }
-    
-    // TODO: Get user's events from database based on session.user_id
-    return c.json({ 
-      events: [
-        {
-          id: 1,
-          title: 'プロジェクト会議',
-          description: '新規プロジェクトのキックオフ会議',
-          status: 'open',
-          deadline: '2025-08-20T23:59:59Z',
-          created_at: '2025-08-15T12:00:00Z',
-          created_by: session.user_id
-        }
-      ]
+
+    const scheduleService = new ScheduleService(c.env.DB)
+    const events = await scheduleService.getUserEvents(session.user_id, {
+      limit: 50
     })
+
+    return c.json({ events })
   } catch (error) {
     console.error('Get events error:', error)
     return c.json({ error: 'Failed to get events' }, 500)
@@ -233,18 +226,21 @@ app.post('/api/events', async (c) => {
     
     const body = await c.req.json()
     
-    // TODO: Create new event in database with session.user_id as created_by
-    const eventData = {
-      id: Math.floor(Math.random() * 10000), // Temporary ID generation
-      ...body,
-      created_by: session.user_id,
-      status: 'draft',
-      created_at: new Date().toISOString()
+    // Validate required fields
+    if (!body.title) {
+      return c.json({ error: 'Event title is required' }, 400)
+    }
+
+    const scheduleService = new ScheduleService(c.env.DB)
+    const result = await scheduleService.createEvent(session.user_id, body)
+
+    if (!result.success) {
+      return c.json({ error: result.error || 'Failed to create event' }, 500)
     }
     
     return c.json({ 
       message: 'Event created successfully', 
-      event: eventData 
+      event: result.event 
     })
   } catch (error) {
     console.error('Create event error:', error)
@@ -253,38 +249,124 @@ app.post('/api/events', async (c) => {
 })
 
 app.get('/api/events/:id', async (c) => {
-  const eventId = c.req.param('id')
-  // TODO: Get specific event with participants and time slots
-  return c.json({
-    event: {
-      id: parseInt(eventId),
-      title: 'プロジェクト会議',
-      description: '新規プロジェクトのキックオフ会議',
-      status: 'open',
-      participants: [
-        { id: 1, name: '小平勘太', email: 'kohira@example.com', status: 'responded' },
-        { id: 2, name: '田中太郎', email: 'tanaka@example.com', status: 'invited' }
-      ],
-      time_slots: [
-        {
-          id: 1,
-          start_datetime: '2025-08-20T10:00:00Z',
-          end_datetime: '2025-08-20T11:30:00Z',
-          responses: [
-            { user_id: 1, status: 'available' },
-            { user_id: 2, status: 'maybe' }
-          ]
-        }
-      ]
+  try {
+    const session = await requireAuth(c)
+    
+    if (!session) {
+      return c.json({ error: 'Authentication required' }, 401)
     }
-  })
+
+    const eventId = parseInt(c.req.param('id'))
+    if (isNaN(eventId)) {
+      return c.json({ error: 'Invalid event ID' }, 400)
+    }
+
+    const scheduleService = new ScheduleService(c.env.DB)
+    const event = await scheduleService.getEventById(eventId, session.user_id)
+
+    if (!event) {
+      return c.json({ error: 'Event not found or access denied' }, 404)
+    }
+
+    return c.json({ event })
+  } catch (error) {
+    console.error('Get event error:', error)
+    return c.json({ error: 'Failed to get event' }, 500)
+  }
 })
 
 app.post('/api/events/:id/respond', async (c) => {
-  const eventId = c.req.param('id')
-  const body = await c.req.json()
-  // TODO: Save availability responses
-  return c.json({ message: 'Response saved', event_id: eventId, responses: body.responses })
+  try {
+    const session = await requireAuth(c)
+    
+    if (!session) {
+      return c.json({ error: 'Authentication required' }, 401)
+    }
+
+    const eventId = parseInt(c.req.param('id'))
+    if (isNaN(eventId)) {
+      return c.json({ error: 'Invalid event ID' }, 400)
+    }
+
+    const body = await c.req.json()
+    
+    if (!body.responses || !Array.isArray(body.responses)) {
+      return c.json({ error: 'Responses array is required' }, 400)
+    }
+
+    const scheduleService = new ScheduleService(c.env.DB)
+    const result = await scheduleService.submitAvailabilityResponses(
+      session.user_id,
+      eventId,
+      body.responses
+    )
+
+    if (!result.success) {
+      return c.json({ error: result.error || 'Failed to save responses' }, 500)
+    }
+
+    return c.json({ 
+      message: 'Responses saved successfully', 
+      event_id: eventId 
+    })
+  } catch (error) {
+    console.error('Submit responses error:', error)
+    return c.json({ error: 'Failed to save responses' }, 500)
+  }
+})
+
+app.get('/api/events/:id/optimal-slots', async (c) => {
+  try {
+    const session = await requireAuth(c)
+    
+    if (!session) {
+      return c.json({ error: 'Authentication required' }, 401)
+    }
+
+    const eventId = parseInt(c.req.param('id'))
+    if (isNaN(eventId)) {
+      return c.json({ error: 'Invalid event ID' }, 400)
+    }
+
+    const scheduleService = new ScheduleService(c.env.DB)
+    const optimalSlots = await scheduleService.findOptimalTimeSlots(eventId)
+
+    if (!optimalSlots) {
+      return c.json({ error: 'Failed to analyze time slots' }, 500)
+    }
+
+    return c.json({ optimal_slots: optimalSlots })
+  } catch (error) {
+    console.error('Get optimal slots error:', error)
+    return c.json({ error: 'Failed to get optimal slots' }, 500)
+  }
+})
+
+app.get('/api/events/:id/statistics', async (c) => {
+  try {
+    const session = await requireAuth(c)
+    
+    if (!session) {
+      return c.json({ error: 'Authentication required' }, 401)
+    }
+
+    const eventId = parseInt(c.req.param('id'))
+    if (isNaN(eventId)) {
+      return c.json({ error: 'Invalid event ID' }, 400)
+    }
+
+    const scheduleService = new ScheduleService(c.env.DB)
+    const statistics = await scheduleService.getEventStatistics(eventId)
+
+    if (!statistics) {
+      return c.json({ error: 'Failed to get event statistics' }, 500)
+    }
+
+    return c.json({ statistics })
+  } catch (error) {
+    console.error('Get event statistics error:', error)
+    return c.json({ error: 'Failed to get event statistics' }, 500)
+  }
 })
 
 app.post('/api/events/:id/confirm', async (c) => {
@@ -295,72 +377,37 @@ app.post('/api/events/:id/confirm', async (c) => {
       return c.json({ error: 'Authentication required' }, 401)
     }
 
-    const eventId = c.req.param('id')
+    const eventId = parseInt(c.req.param('id'))
+    if (isNaN(eventId)) {
+      return c.json({ error: 'Invalid event ID' }, 400)
+    }
+
     const body = await c.req.json()
-    const { time_slot_id, location } = body
+    const { time_slot_id, location, send_calendar_invites = true } = body
 
     if (!time_slot_id) {
       return c.json({ error: 'Time slot ID is required' }, 400)
     }
 
-    // TODO: In real implementation, fetch event and time slot from database
-    // For now, we'll use mock data with proper calendar integration
-    
-    const mockEvent = {
-      id: parseInt(eventId),
-      title: 'プロジェクト会議',
-      description: '新規プロジェクトのキックオフ会議',
-      created_by: session.user_id
-    }
-
-    const mockTimeSlot = {
-      id: parseInt(time_slot_id),
-      start_datetime: '2025-08-20T10:00:00Z',
-      end_datetime: '2025-08-20T11:30:00Z'
-    }
-
-    // Get participant emails (mock data for now)
-    const participantEmails = ['kohira@example.com', 'tanaka@example.com']
-
-    // Create Google Calendar event
-    const calendarService = new CalendarService(c.env.DB)
-    const clientId = c.env.GOOGLE_CLIENT_ID || 'demo-google-client-id'
-    const clientSecret = c.env.GOOGLE_CLIENT_SECRET || 'demo-secret'
-    const appUrl = c.env.APP_URL || new URL(c.req.url).origin
-    const redirectUri = `${appUrl}/api/auth/google/callback`
-    
-    const googleOAuth = new GoogleOAuth(clientId, clientSecret, redirectUri)
-    
-    const result = await calendarService.createEventFromSchedule(
+    const scheduleService = new ScheduleService(c.env.DB)
+    const result = await scheduleService.confirmEvent(
+      eventId,
+      parseInt(time_slot_id),
       session.user_id,
       {
-        title: mockEvent.title,
-        description: mockEvent.description,
-        startTime: mockTimeSlot.start_datetime,
-        endTime: mockTimeSlot.end_datetime,
-        attendeeEmails: participantEmails,
-        location: location || undefined
-      },
-      googleOAuth
+        location,
+        sendCalendarInvites: send_calendar_invites
+      }
     )
 
     if (!result.success) {
-      return c.json({ 
-        error: result.error || 'Failed to create calendar event',
-        fallback_message: 'イベントは確定されましたが、カレンダーへの追加に失敗しました'
-      }, 500)
+      return c.json({ error: result.error || 'Failed to confirm event' }, 500)
     }
 
-    // TODO: Update event status in database to 'confirmed'
-    // TODO: Save confirmed_events record with google_event_id
-
     return c.json({ 
-      message: 'Event confirmed and added to calendar successfully', 
-      event_id: eventId,
-      time_slot_id,
-      google_event_id: result.eventId,
-      calendar_url: result.calendarUrl,
-      location: location || null
+      message: 'Event confirmed successfully', 
+      event: result.confirmedEvent,
+      calendar_result: result.calendarResult
     })
   } catch (error) {
     console.error('Confirm event error:', error)

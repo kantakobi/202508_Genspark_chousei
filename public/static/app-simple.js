@@ -80,6 +80,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 <button onclick="testConflictCheck()" class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700">
                   <i class="fas fa-exclamation-triangle mr-2"></i>競合チェック
                 </button>
+                <button onclick="testScheduleFlow()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                  <i class="fas fa-users mr-2"></i>スケジュール調整
+                </button>
                 <button onclick="testLogout()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
                   <i class="fas fa-sign-out-alt mr-2"></i>ログアウト
                 </button>
@@ -236,5 +239,94 @@ window.testConflictCheck = async function() {
   } catch (error) {
     console.error('Conflict check test failed:', error);
     alert('競合チェック失敗: ' + error.message);
+  }
+};
+
+window.testScheduleFlow = async function() {
+  try {
+    console.log('Testing complete schedule coordination flow...');
+    
+    // Step 1: Create event with time slots
+    const createResponse = await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'スケジュール調整テストイベント',
+        description: 'フル機能テスト用のイベントです',
+        duration_minutes: 90,
+        participants: ['test1@example.com', 'test2@example.com'],
+        time_slots: [
+          {
+            start_datetime: '2025-08-20T10:00:00Z',
+            end_datetime: '2025-08-20T11:30:00Z'
+          },
+          {
+            start_datetime: '2025-08-20T14:00:00Z',
+            end_datetime: '2025-08-20T15:30:00Z'
+          }
+        ],
+        deadline: '2025-08-19T23:59:59Z'
+      })
+    });
+    
+    const createData = await createResponse.json();
+    console.log('Step 1 - Event created:', createData);
+    
+    if (createData.error) {
+      alert('イベント作成エラー: ' + createData.error);
+      return;
+    }
+    
+    const eventId = createData.event?.id;
+    if (!eventId) {
+      alert('イベントIDが取得できませんでした');
+      return;
+    }
+    
+    // Step 2: Get event details
+    const detailResponse = await fetch(`/api/events/${eventId}`);
+    const detailData = await detailResponse.json();
+    console.log('Step 2 - Event details:', detailData);
+    
+    // Step 3: Submit availability responses
+    if (detailData.event?.time_slots?.length > 0) {
+      const responses = detailData.event.time_slots.map(slot => ({
+        time_slot_id: slot.id,
+        status: Math.random() > 0.5 ? 'available' : 'maybe'
+      }));
+      
+      const responseSubmit = await fetch(`/api/events/${eventId}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ responses })
+      });
+      
+      const responseData = await responseSubmit.json();
+      console.log('Step 3 - Responses submitted:', responseData);
+    }
+    
+    // Step 4: Get optimal time slots
+    const optimalResponse = await fetch(`/api/events/${eventId}/optimal-slots`);
+    const optimalData = await optimalResponse.json();
+    console.log('Step 4 - Optimal slots:', optimalData);
+    
+    // Step 5: Get event statistics
+    const statsResponse = await fetch(`/api/events/${eventId}/statistics`);
+    const statsData = await statsResponse.json();
+    console.log('Step 5 - Event statistics:', statsData);
+    
+    const message = `スケジュール調整フロー完了！\n\n` +
+      `✅ イベント作成: ${createData.event?.title}\n` +
+      `✅ 参加者招待: ${detailData.event?.participants?.length || 0}人\n` +
+      `✅ 時間候補: ${detailData.event?.time_slots?.length || 0}件\n` +
+      `✅ 回答率: ${Math.round((statsData.statistics?.response_rate || 0) * 100)}%\n` +
+      `✅ 最適時間帯: ${optimalData.optimal_slots?.[0]?.availability_score || 0}点\n\n` +
+      `詳細はコンソールを確認してください。`;
+    
+    alert(message);
+    
+  } catch (error) {
+    console.error('Schedule flow test failed:', error);
+    alert('スケジュール調整フロー失敗: ' + error.message);
   }
 };
