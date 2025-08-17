@@ -10,9 +10,10 @@
   - レスポンシブUIによる使いやすいインターフェース
 
 ## 公開URL
-- **開発環境**: https://3000-i5oa7t29uya6mmx6ylv0q-6532622b.e2b.dev ✅ **動作確認済み**
-- **APIヘルスチェック**: https://3000-i5oa7t29uya6mmx6ylv0q-6532622b.e2b.dev/api/health
-- **GitHub**: 未設定（予定）
+- **🚀 本番環境**: https://schedule-coordinator.pages.dev ✅ **公開中**
+- **開発環境**: https://3000-i5oa7t29uya6mmx6ylv0q-6532622b.e2b.dev ✅ **開発確認済み**
+- **APIヘルスチェック**: https://schedule-coordinator.pages.dev/api/health
+- **GitHub**: https://github.com/kantakobi/202508_Genspark_chousei ✅ **公開リポジトリ**
 
 ## データアーキテクチャ
 - **データモデル**: 
@@ -76,9 +77,9 @@
 - ✅ データベース統合・永続化
 - ✅ セキュリティ・認証システム
 
-**次のステップ（オプション）**:
-1. **本番デプロイ** - Cloudflare Pagesへの公開
-2. **実際のGoogle API認証** - 本物のGoogle Client ID/Secret設定
+**次のステップ（本番運用強化）**:
+1. ✅ **本番デプロイ完了** - Cloudflare Pagesで公開中
+2. **実際のGoogle API認証設定** - 本物のGoogle Client ID/Secret配置
 3. **UI/UX改善** - より洗練されたフロントエンド
 4. **通知機能** - メール・Slack通知
 5. **モバイルアプリ** - PWA対応
@@ -146,10 +147,11 @@ npm run git:commit "コミットメッセージ"
 ```
 
 ## デプロイ
-- **プラットフォーム**: Cloudflare Pages (予定)
-- **現在のステータス**: ✅ **開発環境で完全動作中**
+- **プラットフォーム**: Cloudflare Pages ✅ **本番稼働中**
+- **現在のステータス**: 🚀 **本番環境で公開済み**
 - **技術スタック**: Hono + TypeScript + TailwindCSS + Cloudflare D1
-- **最終更新**: 2025年8月15日
+- **データベース**: Cloudflare D1 (Production) - ID: 9005eee8-f655-4486-9521-46382ab864c1
+- **最終更新**: 2025年8月17日 - 本番展開完了
 
 ### 🎯 **現在利用可能な機能（フル機能）**
 
