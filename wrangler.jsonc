@@ -10,10 +10,24 @@
     {
       "binding": "DB",
       "database_name": "schedule-coordinator-production",
-      "database_id": ""
+      "database_id": "9005eee8-f655-4486-9521-46382ab864c1"
     }
   ],
   "vars": {
     "APP_URL": "https://schedule-coordinator.pages.dev"
+  },
+  "env": {
+    "production": {
+      "vars": {
+        "APP_URL": "https://schedule-coordinator.pages.dev"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "schedule-coordinator-production",
+          "database_id": "9005eee8-f655-4486-9521-46382ab864c1"
+        }
+      ]
+    }
   }
 }
