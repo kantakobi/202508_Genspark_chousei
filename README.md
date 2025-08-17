@@ -10,9 +10,9 @@
   - レスポンシブUIによる使いやすいインターフェース
 
 ## 公開URL
-- **🚀 本番環境**: https://schedule-coordinator.pages.dev ✅ **公開中**
+- **🚀 本番環境**: ❌ **非公開（一時停止中）**
 - **開発環境**: https://3000-i5oa7t29uya6mmx6ylv0q-6532622b.e2b.dev ✅ **開発確認済み**
-- **APIヘルスチェック**: https://schedule-coordinator.pages.dev/api/health
+- **APIヘルスチェック**: ❌ **非公開中**
 - **GitHub**: https://github.com/kantakobi/202508_Genspark_chousei ✅ **公開リポジトリ**
 
 ## データアーキテクチャ
@@ -147,11 +147,11 @@ npm run git:commit "コミットメッセージ"
 ```
 
 ## デプロイ
-- **プラットフォーム**: Cloudflare Pages ✅ **本番稼働中**
-- **現在のステータス**: 🚀 **本番環境で公開済み**
+- **プラットフォーム**: Cloudflare Pages ❌ **非公開（一時停止）**
+- **現在のステータス**: 🔒 **非公開・開発環境のみ稼働**
 - **技術スタック**: Hono + TypeScript + TailwindCSS + Cloudflare D1
-- **データベース**: Cloudflare D1 (Production) - ID: 9005eee8-f655-4486-9521-46382ab864c1
-- **最終更新**: 2025年8月17日 - 本番展開完了
+- **データベース**: ❌ 削除済み（再展開時に再構築）
+- **最終更新**: 2025年8月17日 - 非公開対応完了
 
 ### 🎯 **現在利用可能な機能（フル機能）**
 
